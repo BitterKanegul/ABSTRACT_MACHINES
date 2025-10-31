@@ -13,8 +13,9 @@
 ;   Upon finishing execution, pop the call-site? i think the stack of execution kinda handles it
 ;
 ;
+
 ;the k in k-cfa
-(define k 2)
+(define k 10)
 (define (update-callsites queue site)
   (define queue+ (append queue `(,site)))
   (if (> (length queue+) k)
@@ -100,7 +101,7 @@
        ,store+
        )]
     [`(prim ,op ,es ...)
-     (match-define `(,k-ptr+ ,store+) (add-kont `(ARG-PRIM ,op ,(rest es) () ,k-ptr) inst stores))
+     (match-define `(,k-ptr+ ,store+) (add-kont `(ARG-PRIM ,op ,(rest es) () ,env ,k-ptr) inst stores))
      `(
        ,(set `(E ,(first es) ,env ,k-ptr+ ,inst))
        ,store+
@@ -170,8 +171,12 @@
      ]
     [`(IF ,t ,f ,env+ ,k-ptr)
      (if expr
-         `( (E ,t ,env+ ,k-ptr ,inst) ,stores )
-         `( (E ,f ,env+ ,k-ptr ,inst) ,stores))]
+         `(
+           (E ,t ,env+ ,k-ptr ,inst)
+           ,stores )
+         `(
+           (E ,f ,env+ ,k-ptr ,inst)
+           ,stores ))]
     ))
 
 ;Performs apply on each kont found at k-ptr
@@ -226,7 +231,6 @@
 ;; Graph x Stores Fixpoint iteration
 (define (graph-step graph stores)
   ; map-graph applies a function with same extra args to each node
-  (println graph)
   (define step_graph (hash-map/copy graph (λ (k _) (values k (step-machine k stores)))))
   ;((node -> (result x store))
   (define graph_update (hash-map/copy step_graph (λ (k v) (values k (first v)))))
@@ -252,7 +256,7 @@
   (h graph stores))
 
 (define (inj-graph-store program)
-  `(,(hash `(E ,program ,(hash) 'Done ()) (set)) ,(hash)))
+  `(,(hash `(E ,program ,(hash) Done ()) (set)) ,(hash 'Done (set))))
 
 
 

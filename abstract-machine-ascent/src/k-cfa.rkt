@@ -43,11 +43,21 @@
    vs
    ))
 (define (store-merge store store_delta)
-  (define all-addrs (set-union (list->set (hash-keys store)) (list->set (hash-keys store_delta))))
+  (define all-addrs
+    (set-union
+     (list->set (hash-keys store))
+     (list->set (hash-keys store_delta))))
   (foldl
-   (lambda (addr acc)((hash-set acc addr (set-union (hash-ref store addr (set)) (hash-ref store_delta addr (set))))))
-   (set)
-   all-addrs
+   (lambda (addr acc)
+     (hash-set
+      acc
+      addr
+      (set-union
+       (hash-ref store addr (set))
+       (hash-ref store_delta addr (set))
+       )))
+   (hash)
+   (set->list all-addrs)
    )
   )
 (define (add-kont kont inst stores)
@@ -79,7 +89,8 @@
     [(? integer? i)
      `(
        ,(set `(A ,i ,k-ptr ,inst))
-       ,stores)]
+       ,stores
+       )]
     [`(if ,g ,t ,f)
      (match-define `(,k-ptr+ ,store+) (add-kont `(IF ,t ,f ,env ,k-ptr) inst stores))
      `(
@@ -98,14 +109,16 @@
 
      `(
        ,(set `(E ,f ,env ,k-ptr+ ,(update-callsites inst expr)))
-       ,store+)
+       ,store+
+       )
      ]
     [`(let ([,x ,e]) ,e-b)
      (match-define `(,k-ptr+ ,store+) (add-kont `(ARG () (Clo (lambda (,x) ,e-b) ,env) ,k-ptr) inst stores))
 
      `(
        ,(set `(E ,e ,env ,k-ptr+ ,inst))
-       ,store+)]
+       ,store+
+       )]
     ))
 
 
@@ -211,13 +224,18 @@
 ;; Graph x Stores Fixpoint iteration
 (define (graph-step graph stores)
   ; map-graph applies a function with same extra args to each node
-  (print graph)
+  (println graph)
   (define step_graph (hash-map/copy graph (lambda (k _) (values k (step-machine k stores)))))
   ;((node -> (result x store))
   (define graph_update (hash-map/copy step_graph (lambda (k v) (values k (first v)))))
   (define store_updates (hash-map step_graph (lambda (_ v) (second v))))
   (define graph+ (graph-merge graph graph_update))
-  (define stores+ (foldl (lambda (s acc)(println (format "------------ ~a " s))(store-merge acc s)) stores store_updates))
+  (define stores+
+    (foldl
+     (lambda (s acc)
+       (store-merge acc s))
+     stores
+     store_updates))
   `(,graph+ ,stores+)
   )
 

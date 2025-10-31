@@ -37,7 +37,7 @@
   (hash-set store kaddr (set-add (hash-ref store kaddr (set)) kont)))
 (define (store-bind store xaddrs vs)
   (foldl
-   (lambda (k v acc) (store-update acc k v))
+   (λ (k v acc) (store-update acc k v))
    store
    xaddrs
    vs
@@ -48,7 +48,7 @@
      (list->set (hash-keys store))
      (list->set (hash-keys store_delta))))
   (foldl
-   (lambda (addr acc)
+   (λ (addr acc)
      (hash-set
       acc
       addr
@@ -71,13 +71,13 @@
   (match expr
     [(? symbol? x)
      `(
-       ,(list->set (set-map (get x env stores) (lambda (v) `(A ,v ,k-ptr ,inst))))
+       ,(list->set (set-map (get x env stores) (λ (v) `(A ,v ,k-ptr ,inst))))
        ,stores
        )
      ]
-    [`(lambda (,xs ...) ,e)
+    [`(λ (,xs ...) ,e)
      `(
-       ,(set `(A (Clo (lambda (,@xs) ,e)) ,k-ptr ,inst))
+       ,(set `(A (Clo (λ (,@xs) ,e)) ,k-ptr ,inst))
        ,stores
        )]
     [(? boolean? b)
@@ -113,7 +113,7 @@
        )
      ]
     [`(let ([,x ,e]) ,e-b)
-     (match-define `(,k-ptr+ ,store+) (add-kont `(ARG () (Clo (lambda (,x) ,e-b) ,env) ,k-ptr) inst stores))
+     (match-define `(,k-ptr+ ,store+) (add-kont `(ARG () (Clo (λ (,x) ,e-b) ,env) ,k-ptr) inst stores))
 
      `(
        ,(set `(E ,e ,env ,k-ptr+ ,inst))
@@ -143,12 +143,12 @@
      (define f (first vs))
      (define vs+ (append (second vs) (list expr)))
      (match f
-       [`(Clo (lambda (,xs ...) ,e) ,env+)
+       [`(Clo (λ (,xs ...) ,e) ,env+)
         ;;Bind ,xs to new environment and add to store
-        (define addrs (map (lambda (x) (xalloc x inst)) xs))
+        (define addrs (map (λ (x) (xalloc x inst)) xs))
         (define env++
           (foldl
-           (lambda (x addr acc) (hash-set acc x addr))
+           (λ (x addr acc) (hash-set acc x addr))
            env+
            xs
            addrs
@@ -177,9 +177,9 @@
   (match-define `(,tag ,expr ,k-ptr ,inst) state)
   (define ks (set->list (hash-ref stores k-ptr)))
   ;;(set-of-states x store-updates)
-  (define results (map (lambda (k) (step-apply expr k stores inst)) ks))
+  (define results (map (λ (k) (step-apply expr k stores inst)) ks))
   (define states+ (list->set (map first results)))
-  (define stores+ (foldl (lambda (s acc) (store-merge acc s)) stores (map second results)))
+  (define stores+ (foldl (λ (s acc) (store-merge acc s)) stores (map second results)))
   (print stores+)
   `(,states+ ,stores+)
   )
@@ -201,17 +201,17 @@
   ;add all edges from delta
   (define graph+ (hash-map/copy
                   graph
-                  (lambda (k v)
+                  (λ (k v)
                     (values k (set-union v (hash-ref graph-delta k (set)))))))
   ; Make a set of all the nodes on rhs
   (define reached-nodes
     (foldl
-     (lambda (v acc) (set-union acc v))
+     (λ (v acc) (set-union acc v))
      (set)
      (hash-values graph-delta)))
   ;add new nodes to graph+
   (foldl
-   (lambda (n acc) (hash-set acc n (set)))
+   (λ (n acc) (hash-set acc n (set)))
    graph+
    (set->list (set-subtract reached-nodes (list->set (hash-keys graph))))
    )
@@ -225,14 +225,14 @@
 (define (graph-step graph stores)
   ; map-graph applies a function with same extra args to each node
   (println graph)
-  (define step_graph (hash-map/copy graph (lambda (k _) (values k (step-machine k stores)))))
+  (define step_graph (hash-map/copy graph (λ (k _) (values k (step-machine k stores)))))
   ;((node -> (result x store))
-  (define graph_update (hash-map/copy step_graph (lambda (k v) (values k (first v)))))
-  (define store_updates (hash-map step_graph (lambda (_ v) (second v))))
+  (define graph_update (hash-map/copy step_graph (λ (k v) (values k (first v)))))
+  (define store_updates (hash-map step_graph (λ (_ v) (second v))))
   (define graph+ (graph-merge graph graph_update))
   (define stores+
     (foldl
-     (lambda (s acc)
+     (λ (s acc)
        (store-merge acc s))
      stores
      store_updates))

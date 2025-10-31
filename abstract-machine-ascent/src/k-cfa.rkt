@@ -71,13 +71,15 @@
   (match expr
     [(? symbol? x)
      `(
-       ,(list->set (set-map (get x env stores) (λ (v) `(A ,v ,k-ptr ,inst))))
+       ,(list->set (set-map (get x env stores)
+                            (λ (v)
+                              `(A ,v ,k-ptr ,inst))))
        ,stores
        )
      ]
     [`(λ (,xs ...) ,e)
      `(
-       ,(set `(A (Clo (λ (,@xs) ,e)) ,k-ptr ,inst))
+       ,(set `(A (Clo (λ (,@xs) ,e) ,env) ,k-ptr ,inst))
        ,stores
        )]
     [(? boolean? b)
@@ -141,7 +143,7 @@
 
     [`(ARG () ,vs ,env ,k-ptr)
      (define f (first vs))
-     (define vs+ (append (second vs) (list expr)))
+     (define vs+ (append (rest vs) (list expr)))
      (match f
        [`(Clo (λ (,xs ...) ,e) ,env+)
         ;;Bind ,xs to new environment and add to store

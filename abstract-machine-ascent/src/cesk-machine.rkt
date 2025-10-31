@@ -73,4 +73,77 @@
 (define expr_omega '((lam (x) (x x)) (lam (x) (x x))))
 (define expr_simple '((lam (x) x) (lam (y) y)))
 
-(step* `( ,expr_simple ,(hash)  ,init_store ,init_ptr))
+;(step* `( ,expr_omega ,(hash)  ,init_store ,init_ptr))
+
+
+; CESK* with timestamps
+; We include a time component
+
+; Returns the next time
+(define (tick ς) '())
+; Returns a fresh address for a binding or continuation
+(define (alloc ς) '())
+; go from σ to σ[a ⇒ val]
+(define (⇒ σ val) '())
+;add v to σ and ρ
+(define (ρ⇒ ρ σ x v) '())
+;get x from store
+(define (get x ρ σ) (hash-ref σ (hash-ref ρ x)))
+
+(define (→ ς)
+  (match ς
+    [`(,(? symbol? x) ,ρ ,σ ,a ,t)
+     (match-define `(Clo ,e ,ρ+) (get x ρ σ))
+     `(,e ,ρ+ ,σ ,a ,(tick ς))]
+    [`((,e0 ,e1) ,ρ ,σ ,a ,t)
+     (define κ+ `(Ar ,e1 ,ρ ,a))
+     `(,e0 ,ρ ,@(⇒ σ κ+) ,(tick ς))]
+
+    [`((λ (,x) ,e) ,ρ ,σ ,a ,t)
+     (match (get σ a)
+       [`(Ar ,e1 ,ρ1 ,a1)
+        (define κ+ `(Fn(Clo (λ(,x) ,e) ,ρ) ,a1))
+        `(,e1 ,ρ1 ,@(⇒ σ κ+) ,(tick ς))]
+
+       [`(Fn (Clo (λ(,x1) ,e1) ,ρ1) ,a1)
+        (define v `(Clo (λ (,x) ,e) ,ρ))
+        `(,e1 ,@(ρ⇒ ρ1 σ x1 v) ,a1 ,(tick ς))]
+       )]
+    [_ #f]))
+
+(define (→* ς)
+  (let loop ([ςt ς])
+    (and ςt
+         (begin
+           (pretty-print ςt ) (displayln "->")
+           (loop (→ ςt))))))
+
+
+
+; k-CFA using the CESK* machine
+
+;     Essentially defining the tick function in the right way.
+
+; Lazy Krivine Machine
+; essentially we have thunks to delay execution
+
+; State and Control : CESHK machine
+; (if g et ef) \rho \sigma a t -> \kappa = (If et ef \rho a)
+; #f -> get \kappa =(If et ef \rho' a')  -> (ef \rho' \sigma a' t)
+; not #f -> get \kappa =(If et ef \rho' a') -> (et \rho' \sigma a' t)
+;
+; if κ = set(a′, c) 〈(set! x e), ρ, σ, a, t〉 ->  〈e, ρ, σ ⊔ [b → set(ρ(x), a)], b, u〉
+;
+; if κ = fn(callcc, ρ′, c) :
+;       〈(λx.e), ρ, ˆσ, a, t〉-> 〈e, ρ[x → b], σ ⊔ [b → c], c, u〉
+;                                           where c = alloc(ς, κ)
+; if κ = fn(callcc, ρ′, a′):
+;       〈c, ρ, σ, a, t〉 -> 〈a, ρ, σ, c, u〉
+;if κ = fn(c, ρ′, a′):
+;       〈v, ρ, σ, a, t〉-> 〈v, ρ, σ, c, u〉
+;
+;
+;
+; Abstract GC
+
+; Abstrack Stack Interpretation

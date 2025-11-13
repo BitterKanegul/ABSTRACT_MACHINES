@@ -1,5 +1,7 @@
 #lang racket
 (require racket/cmdline)
+(require json)
+
 
 
 ;; Abstract store and instrumentation updates
@@ -15,7 +17,7 @@
 ;
 
 ;the k in k-cfa
-(define k 10)
+(define k 1)
 (define (update-callsites queue site)
   (define queue+ (append queue `(,site)))
   (if (> (length queue+) k)
@@ -109,9 +111,9 @@
      ]
     [`(,f ,args ...)                               ; Update the instrumentation here
      (match-define `(,k-ptr+ ,store+) (add-kont `(ARG ,args () ,env ,k-ptr) inst stores))
-
+     ;For Pushdown precision, we use the new environment and the new environment as our instrumentation
      `(
-       ,(set `(E ,f ,env ,k-ptr+ ,(update-callsites inst expr)))
+       ,(set `(E ,f ,env ,k-ptr+ ,(update-callsites inst `(,f ,env))))
        ,store+
        )
      ]
@@ -187,7 +189,7 @@
   (define results (map (λ (k) (step-apply expr k stores inst)) ks))
   (define states+ (list->set (map first results)))
   (define stores+ (foldl (λ (s acc) (store-merge acc s)) stores (map second results)))
-  (print stores+)
+
   `(,states+ ,stores+)
   )
 
@@ -258,8 +260,110 @@
 (define (inj-graph-store program)
   `(,(hash `(E ,program ,(hash) Done ()) (set)) ,(hash 'Done (set))))
 
+;; Graphviz DOT file generation for k-CFA analysis results
 
+;; Helper: escape strings for DOT format
+(define (escape-dot-string s)
+  (string-replace
+   (string-replace
+    (string-replace (~a s) "\"" "\\\"")
+    "\n" "\\n")
+   "{" "\\{"))
 
+;; Helper: create a unique node ID
+(define (state->node-id state)
+  (define str (~a state))
+  (define hash-val (equal-hash-code str))
+  (format "node_~a" hash-val))
+
+;; Helper: format state for label
+(define (state->label state)
+  (match state
+    [`(E ,expr ,env ,k-ptr ,inst)
+     (format "E\\n~a\\nκ: ~a\\ninst: ~a"
+             (escape-dot-string expr)
+             (escape-dot-string k-ptr)
+             (escape-dot-string inst))]
+    [`(A ,val ,k-ptr ,inst)
+     (format "A\\n~a\\nκ: ~a\\ninst: ~a"
+             (escape-dot-string val)
+             (escape-dot-string k-ptr)
+             (escape-dot-string inst))]
+    [else (escape-dot-string state)]))
+
+;; Helper: get color based on state type
+(define (state->color state)
+  (match state
+    [`(E ,_ ,_ ,_ ,_) "lightblue"]
+    [`(A ,_ ,_ ,_) "lightgreen"]
+    [else "white"]))
+
+;; Helper: format store entry for display
+(define (format-store-entry addr values)
+  (format "~a →\\n  ~a"
+          (escape-dot-string addr)
+          (escape-dot-string
+           (string-join
+            (map ~a (set->list values))
+            "\\n  "))))
+
+;; Main function: write graph and stores to DOT file
+(define (write-graphviz-file graph stores filename)
+  (with-output-to-file filename
+    #:exists 'replace
+    (lambda ()
+      (displayln "digraph KCFA {")
+      (displayln "  rankdir=LR;")
+      (displayln "  node [shape=box, style=filled];")
+      (newline)
+
+      ;; Write all nodes with labels
+      (displayln "  // Nodes")
+      (for ([state (hash-keys graph)])
+        (define node-id (state->node-id state))
+        (define label (state->label state))
+        (define color (state->color state))
+        (printf "  ~a [label=\"~a\", fillcolor=~a];~n"
+                node-id label color))
+      (newline)
+
+      ;; Write all edges
+      (displayln "  // Edges")
+      (for ([(source targets) (in-hash graph)])
+        (define source-id (state->node-id source))
+        (for ([target (in-set targets)])
+          (define target-id (state->node-id target))
+          (printf "  ~a -> ~a;~n" source-id target-id)))
+      (newline)
+
+      ;; Write store as a separate subgraph
+      (displayln "  // Store")
+      (displayln "  subgraph cluster_store {")
+      (displayln "    label=\"Abstract Store\";")
+      (displayln "    style=filled;")
+      (displayln "    fillcolor=lightyellow;")
+      (displayln "    node [shape=note, fillcolor=white];")
+      (newline)
+      (for ([(addr values) (in-hash stores)])
+        (when (not (set-empty? values))
+          (define store-id (format "store_~a" (equal-hash-code (~a addr))))
+          (define label (format-store-entry addr values))
+          (printf "    ~a [label=\"~a\"];~n" store-id label)))
+      (displayln "  }")
+
+      (displayln "}"))))
+
+;; Convenience function: analyze and visualize
+(define (analyze-and-visualize program output-file)
+  (match-define `(,graph ,stores) (fixpoint (inj-graph-store program)))
+  (write-graphviz-file graph stores output-file)
+  (printf "Graphviz DOT file written to: ~a~n" output-file)
+  (printf "Render with: dot -Tpng ~a -o output.png~n" output-file)
+  `(,graph ,stores))
+
+;; Example usage (add to end of your file):
+;; (define result (fixpoint (inj-graph-store program)))
+;; (write-graphviz-file (first result) (second result) "output.dot")
 
 ;; Result debugging and visualization
 (define cfa-file
@@ -268,10 +372,19 @@
    #:args (filename)
    filename
    ))
+(define (run-program filename)
+  (match-define `(,graph ,stores)  (fixpoint (inj-graph-store (with-input-from-file filename read))))
+  (write-graphviz-file graph stores "output.dot")
+  )
 (if (file-exists? cfa-file)
-    (fixpoint (inj-graph-store (with-input-from-file cfa-file read)))
+    (run-program cfa-file)
     (error "File not found")
     )
+
+
+
+
+
 
 ;; Datastructures that we need
 ; Set

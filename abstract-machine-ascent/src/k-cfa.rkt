@@ -269,12 +269,16 @@
     (string-replace (~a s) "\"" "\\\"")
     "\n" "\\n")
    "{" "\\{"))
-
+;; '-' messes up graphviz
+(define (number->dot-string n)
+  (if (negative? n)
+      (format "n~a" (abs n))
+      (~a n)))
 ;; Helper: create a unique node ID
 (define (state->node-id state)
-  (define str (~a state))
-  (define hash-val (equal-hash-code str))
-  (format "node_~a" hash-val))
+  ;(define str (~a state))
+  (define hash-val (equal-hash-code state))
+  (format "node_~a" (number->dot-string hash-val)))
 
 ;; Helper: format state for label
 (define (state->label state)
@@ -311,7 +315,7 @@
 (define (write-graphviz-file graph stores filename)
   (with-output-to-file filename
     #:exists 'replace
-    (lambda ()
+    (λ()
       (displayln "digraph KCFA {")
       (displayln "  rankdir=LR;")
       (displayln "  node [shape=box, style=filled];")
@@ -333,7 +337,10 @@
         (define source-id (state->node-id source))
         (for ([target (in-set targets)])
           (define target-id (state->node-id target))
-          (printf "  ~a -> ~a;~n" source-id target-id)))
+          (printf "  ~a -> ~a;~n" source-id target-id)
+          ; ;TEST
+          ; (printf "  ~a -> ~a;~n" source target)
+          ))
       (newline)
 
       ;; Write store as a separate subgraph
@@ -374,7 +381,7 @@
    ))
 (define (run-program filename)
   (match-define `(,graph ,stores)  (fixpoint (inj-graph-store (with-input-from-file filename read))))
-  (write-graphviz-file graph stores "output.dot")
+  (write-graphviz-file graph stores "output2.dot")
   )
 (if (file-exists? cfa-file)
     (run-program cfa-file)

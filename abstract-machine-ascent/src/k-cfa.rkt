@@ -32,7 +32,7 @@
   `(kalloc ,kont ,instrumentation))
 
 (define (xalloc var instrumentation)
-  `(xalloc ,var))
+  `(xalloc ,var ,instrumentation))
 
 
 ;join on a store
@@ -71,15 +71,8 @@
 
 (define (step-eval state stores)
   (match-define `(,tag ,expr ,env ,k-ptr ,inst) state)
+  ; (print (format "~a--->" state))
   (match expr
-    [(? symbol? x)
-     `(
-       ,(list->set (set-map (get x env stores)
-                            (λ (v)
-                              `(A ,v ,k-ptr ,inst))))
-       ,stores
-       )
-     ]
     [`(λ (,xs ...) ,e)
      `(
        ,(set `(A (Clo (λ (,@xs) ,e) ,env) ,k-ptr ,inst))
@@ -95,6 +88,14 @@
      `(
        ,(set `(A ,i ,k-ptr ,inst))
        ,stores
+       )]
+    [`(let ([,x ,e1]) ,e-b)
+     ; (print (format "| x is ~a  e1 is ~a e-b is ~a" x e1 e-b)   )
+     (match-define `(,k-ptr+ ,store+) (add-kont `(ARG () ((Clo (λ (,x) ,e-b) ,env)) ,env ,k-ptr)  inst stores))
+
+     `(
+       ,(set `(E ,e1 ,env ,k-ptr+ ,inst))
+       ,store+
        )]
     [`(if ,g ,t ,f)
      (match-define `(,k-ptr+ ,store+) (add-kont `(IF ,t ,f ,env ,k-ptr) inst stores))
@@ -117,13 +118,15 @@
        ,store+
        )
      ]
-    [`(let ([,x ,e]) ,e-b)
-     (match-define `(,k-ptr+ ,store+) (add-kont `(ARG () (Clo (λ (,x) ,e-b) ,env) ,k-ptr) inst stores))
 
+    [(? symbol? x)
      `(
-       ,(set `(E ,e ,env ,k-ptr+ ,inst))
-       ,store+
-       )]
+       ,(list->set (set-map (get x env stores)
+                            (λ (v)
+                              `(A ,v ,k-ptr ,inst))))
+       ,stores
+       )
+     ]
     ))
 
 

@@ -1,0 +1,60 @@
+Taken from https://www.larcenists.org/benchmarksAboutR6.html
+
+1. tak: vanilla version of the TAKeuchi function.
+
+(define (tak x y z)
+  (if (not (< y x))
+      z
+      (tak (tak (- x 1) y z)
+           (tak (- y 1) z x)
+           (tak (- z 1) x y))))
+instantiate it with different numbers.
+
+2. Fibonacci doubly recursive
+(define (fib n)
+  (if (< n 2)
+      n
+      (+ (fib (- n 1))
+         (fib (- n 2)))))
+
+3. Sum integers 0 to 10000
+
+(define (run n)
+  (let loop ((i n) (sum 0))
+    (if (< i 0)
+      sum
+      (loop (- i 1) (+ i sum)))))
+
+4. Ackermann function: Needs cond matching
+(define (ack m n)
+  (cond ((= m 0) (+ n 1))
+        ((= n 0) (ack (- m 1) 1))
+        (else (ack (- m 1) (ack m (- n 1))))))
+
+5. Nqueens : needs list processing primitives
+(define (nqueens n)
+
+  (define (iota1 n)
+    (let loop ((i n) (l '()))
+      (if (= i 0) l (loop (- i 1) (cons i l)))))
+
+  (define (my-try x y z)
+    (if (null? x)
+      (if (null? y)
+        (begin (if trace? (begin (write z) (newline))) 1)
+        0)
+      (+ (if (ok? (car x) 1 z)
+           (my-try (append (cdr x) y) '() (cons (car x) z))
+           0)
+         (my-try (cdr x) (cons (car x) y) z))))
+
+  (define (ok? row dist placed)
+    (if (null? placed)
+      #t
+      (and (not (= (car placed) (+ row dist)))
+           (not (= (car placed) (- row dist)))
+           (ok? row (+ dist 1) (cdr placed)))))
+
+  (my-try (iota1 n) '() '()))
+
+6.
